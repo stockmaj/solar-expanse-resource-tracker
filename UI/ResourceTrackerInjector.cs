@@ -670,6 +670,8 @@ namespace SolarExpanseResourceTracker.UI
             LoadConfig();
             BuildChrome(headerParent);
             ApplyHeaderHeight(0f);
+            // Apply initial tab state: show/hide filter inputs, clean stale active resources
+            SwitchTab(_stockpilesTab);
         }
 
         void LoadConfig()
@@ -851,6 +853,7 @@ namespace SolarExpanseResourceTracker.UI
                 kv.Value.gameObject.SetActive(showOnThisTab);
                 if (!showOnThisTab) _activeResources.Remove(kv.Key);
             }
+            if (!stockpiles) _config?.SaveActive(_activeResources); // persist after non-deposit cleanup
             if (!stockpiles) RebuildDepositFilterRow();
             UpdateTabHighlights();
             UpdateToggleHighlights();
@@ -1975,11 +1978,7 @@ namespace SolarExpanseResourceTracker.UI
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
             bodyCellHLG.spacing = 3f; bodyCellHLG.padding = new RectOffset(0, 0, 0, 0);
-            var bodyCellBg = bodyCell.AddComponent<Image>();
-            bodyCellBg.color = Color.clear;
-            bodyCellBg.raycastTarget = true;
             var bodyCellBtn = bodyCell.AddComponent<Button>();
-            bodyCellBtn.targetGraphic = bodyCellBg;
             var bodyCellBtnColors = bodyCellBtn.colors;
             bodyCellBtnColors.normalColor      = new Color(1f, 1f, 1f, 1f);
             bodyCellBtnColors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
@@ -2003,6 +2002,18 @@ namespace SolarExpanseResourceTracker.UI
             bodyTMP.color = ColBody; bodyTMP.enableWordWrapping = false;
             bodyTMP.overflowMode = TextOverflowModes.Ellipsis; bodyTMP.raycastTarget = false;
             c.BodyTMP = bodyTMP;
+            // Invisible full-stretch overlay on the text GO provides the click target
+            // (Image and TMP must not share a GO — overlay is a child of bodyTxtGO)
+            var bodyOverlay = new GameObject("BtnOv", typeof(RectTransform));
+            bodyOverlay.transform.SetParent(bodyTxtGO.transform, false);
+            bodyOverlay.AddComponent<LayoutElement>().ignoreLayout = true;
+            var bodyOvRT = bodyOverlay.GetComponent<RectTransform>();
+            bodyOvRT.anchorMin = Vector2.zero; bodyOvRT.anchorMax = Vector2.one;
+            bodyOvRT.offsetMin = bodyOvRT.offsetMax = Vector2.zero;
+            var bodyOvImg = bodyOverlay.AddComponent<Image>();
+            bodyOvImg.color = Color.clear;
+            bodyOvImg.raycastTarget = true;
+            bodyCellBtn.targetGraphic = bodyOvImg;
             c.ResTMP   = AddCol(go.transform, SW_Res,   0f, TextAlignmentOptions.MidlineLeft,  "", ColBody, 0f);
             c.QtyTMP   = AddCol(go.transform, SW_Qty,   0f, TextAlignmentOptions.MidlineRight, "", ColBody, 0f);
             c.StateTMP = AddCol(go.transform, SW_State, 0f, TextAlignmentOptions.Midline,      "", ColDim,  0f);
@@ -2205,11 +2216,7 @@ namespace SolarExpanseResourceTracker.UI
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
             bodyCellHLG.spacing = 3f; bodyCellHLG.padding = new RectOffset(0, 0, 0, 0);
-            var bodyCellBg = bodyCell.AddComponent<Image>();
-            bodyCellBg.color = Color.clear;
-            bodyCellBg.raycastTarget = true;
             var bodyCellBtn = bodyCell.AddComponent<Button>();
-            bodyCellBtn.targetGraphic = bodyCellBg;
             var bodyCellBtnColors = bodyCellBtn.colors;
             bodyCellBtnColors.normalColor      = new Color(1f, 1f, 1f, 1f);
             bodyCellBtnColors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
@@ -2231,6 +2238,16 @@ namespace SolarExpanseResourceTracker.UI
             bodyTMP.color = ColBody; bodyTMP.enableWordWrapping = false;
             bodyTMP.overflowMode = TextOverflowModes.Ellipsis; bodyTMP.raycastTarget = false;
             c.BodyTMP = bodyTMP;
+            var bodyOverlay2 = new GameObject("BtnOv", typeof(RectTransform));
+            bodyOverlay2.transform.SetParent(bodyTxtGO.transform, false);
+            bodyOverlay2.AddComponent<LayoutElement>().ignoreLayout = true;
+            var bodyOv2RT = bodyOverlay2.GetComponent<RectTransform>();
+            bodyOv2RT.anchorMin = Vector2.zero; bodyOv2RT.anchorMax = Vector2.one;
+            bodyOv2RT.offsetMin = bodyOv2RT.offsetMax = Vector2.zero;
+            var bodyOv2Img = bodyOverlay2.AddComponent<Image>();
+            bodyOv2Img.color = Color.clear;
+            bodyOv2Img.raycastTarget = true;
+            bodyCellBtn.targetGraphic = bodyOv2Img;
             c.ResTMP   = AddCol(go.transform, DW_Res,   0f, TextAlignmentOptions.MidlineLeft,   "", ColBody, 0f);
             c.TotalTMP = AddCol(go.transform, DW_Total, 0f, TextAlignmentOptions.MidlineRight,  "", ColDim,  0f);
             c.EffTMP   = AddCol(go.transform, DW_Eff,   0f, TextAlignmentOptions.MidlineRight,  "", ColGold, 0f);
