@@ -13,7 +13,7 @@ namespace SolarExpanseResourceTracker.Core
 
         public static string FormatKT(double v)
         {
-            if (v >= 1_000_000) return $"{v / 1_000_000:F2}MT";
+            if (v >= 1_000_000) return $"{v / 1_000_000:F1}MT";
             if (v >= 1_000)     return $"{v / 1_000:F1}KT";
             return $"{v:F1}T";
         }

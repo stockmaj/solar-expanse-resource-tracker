@@ -702,6 +702,9 @@ namespace SolarExpanseResourceTracker.UI
             var colsBtn = MakeSmallButton("ColsBtn", tabRow.transform, font, "Show Resources", 100f,
                 new Color(0.10f, 0.14f, 0.20f, 0.5f), new Color(0.20f, 0.30f, 0.45f, 0.8f));
             colsBtn.onClick.AddListener(ToggleColFilter);
+            var helpSpacer = new GameObject("HelpSp", typeof(RectTransform));
+            helpSpacer.transform.SetParent(tabRow.transform, false);
+            helpSpacer.AddComponent<LayoutElement>().preferredWidth = 8f;
             var helpBtn = MakeSmallButton("HelpBtn", tabRow.transform, font, "?", 20f,
                 new Color(0.08f, 0.18f, 0.10f, 0.5f), new Color(0.12f, 0.40f, 0.20f, 0.8f));
             const string HelpBase = "https://github.com/stockmaj/solar-expanse-resource-tracker#";
@@ -753,7 +756,7 @@ namespace SolarExpanseResourceTracker.UI
             iconsHLG.childControlWidth      = true;
             iconsHLG.childForceExpandWidth  = false;
             iconsHLG.childControlHeight     = true;
-            iconsHLG.childForceExpandHeight = true;
+            iconsHLG.childForceExpandHeight = false;
             iconsHLG.spacing  = 3f;
             iconsHLG.padding  = new RectOffset(2, 2, 2, 2);
 
@@ -894,7 +897,6 @@ namespace SolarExpanseResourceTracker.UI
             {
                 // Outer HLG row containing 2 cells (or 1 cell + spacer)
                 var rowGO = MakeHRow($"FRow{rowIdx}", _filterInputsGO.transform, CellH, 4f);
-                rowGO.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true; // equal-width columns
 
                 for (int colIdx = 0; colIdx < 2; colIdx++)
                 {
@@ -919,7 +921,9 @@ namespace SolarExpanseResourceTracker.UI
                     // Cell: VLG — header sub-row on top, data sub-row below
                     var cell    = new GameObject($"FCell_{rdId}", typeof(RectTransform));
                     cell.transform.SetParent(rowGO.transform, false);
-                    cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                    var cellLE = cell.AddComponent<LayoutElement>();
+                    cellLE.flexibleWidth  = 1f;
+                    cellLE.preferredWidth = 1f;  // override content preferred so both cols get equal width
                     var cellVLG = cell.AddComponent<VerticalLayoutGroup>();
                     cellVLG.childControlHeight     = true;
                     cellVLG.childControlWidth      = true;
@@ -945,9 +949,21 @@ namespace SolarExpanseResourceTracker.UI
                         (icon.Length > 0 ? icon + " " : "") + name + ":",
                         8f, 0f, TextAlignmentOptions.MidlineRight, ColDim, flexibleWidth: 1f);
 
+                    TMP_InputField qtyInputRef = null;
                     var qtyInput  = MakeInputField($"Q_{rdId}",  dataRow.transform, font,
                         initQty  > 0 ? initQty.ToString("F2")  : "0.00", ColQty,
-                        s => { if (float.TryParse(s, out float v)) _depositMinQty[capturedId]  = v; else _depositMinQty.Remove(capturedId);  _config?.SaveDepositQty(_depositMinQty);  _forceRefresh = true; RefreshRows(force: true); });
+                        s => {
+                            if (float.TryParse(s, System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out float v))
+                            {
+                                v = UnityEngine.Mathf.Max(v, 0f);
+                                _depositMinQty[capturedId] = v;
+                                if (qtyInputRef != null) qtyInputRef.text = v.ToString("F2");
+                            }
+                            else _depositMinQty.Remove(capturedId);
+                            _config?.SaveDepositQty(_depositMinQty); _forceRefresh = true; RefreshRows(force: true);
+                        });
+                    qtyInputRef = qtyInput;
 
                     MakeLabel($"QtyUnit_{rdId}", dataRow.transform, font, "KT", 8f, ColUnit,
                         TextAlignmentOptions.MidlineLeft, ColDim);
@@ -1862,7 +1878,8 @@ namespace SolarExpanseResourceTracker.UI
         void BuildStockpilesHeader()
         {
             var hdr = MakeHRow("SHdr", _tableHeaderParent, 16f, 0f);
-            AddHeaderCol(hdr.transform, SW_Body,  0f, TextAlignmentOptions.MidlineLeft,  "BODY");
+            AddHeaderCol(hdr.transform, SW_Body,  0f, TextAlignmentOptions.MidlineLeft,  "BODY")
+                .margin = new Vector4(17f, 0f, 0f, 0f); // indent to align with sprite+text in data rows
             AddHeaderCol(hdr.transform, SW_Res,   0f, TextAlignmentOptions.MidlineLeft,  "RESOURCE");
             AddHeaderCol(hdr.transform, SW_Qty,   0f, TextAlignmentOptions.MidlineRight, "QTY");
             AddHeaderCol(hdr.transform, SW_State, 0f, TextAlignmentOptions.Midline,"STATE");
@@ -1958,7 +1975,11 @@ namespace SolarExpanseResourceTracker.UI
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
             bodyCellHLG.spacing = 3f; bodyCellHLG.padding = new RectOffset(0, 0, 0, 0);
+            var bodyCellBg = bodyCell.AddComponent<Image>();
+            bodyCellBg.color = Color.clear;
+            bodyCellBg.raycastTarget = true;
             var bodyCellBtn = bodyCell.AddComponent<Button>();
+            bodyCellBtn.targetGraphic = bodyCellBg;
             var bodyCellBtnColors = bodyCellBtn.colors;
             bodyCellBtnColors.normalColor      = new Color(1f, 1f, 1f, 1f);
             bodyCellBtnColors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
@@ -2076,7 +2097,8 @@ namespace SolarExpanseResourceTracker.UI
         void BuildDepositsHeader()
         {
             var hdr = MakeHRow("DHdr", _tableHeaderParent, 16f, 0f);
-            AddHeaderCol(hdr.transform, DW_Body,  0f, TextAlignmentOptions.MidlineLeft,  "BODY");
+            AddHeaderCol(hdr.transform, DW_Body,  0f, TextAlignmentOptions.MidlineLeft,  "BODY")
+                .margin = new Vector4(17f, 0f, 0f, 0f);
             AddHeaderCol(hdr.transform, DW_Res,   0f, TextAlignmentOptions.MidlineLeft,  "RESOURCE");
             AddHeaderCol(hdr.transform, DW_Total, 0f, TextAlignmentOptions.MidlineRight, "TOTAL");
             var effTMP = AddHeaderCol(hdr.transform, DW_Eff,   0f, TextAlignmentOptions.MidlineRight, "EFF");
@@ -2183,7 +2205,11 @@ namespace SolarExpanseResourceTracker.UI
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
             bodyCellHLG.spacing = 3f; bodyCellHLG.padding = new RectOffset(0, 0, 0, 0);
+            var bodyCellBg = bodyCell.AddComponent<Image>();
+            bodyCellBg.color = Color.clear;
+            bodyCellBg.raycastTarget = true;
             var bodyCellBtn = bodyCell.AddComponent<Button>();
+            bodyCellBtn.targetGraphic = bodyCellBg;
             var bodyCellBtnColors = bodyCellBtn.colors;
             bodyCellBtnColors.normalColor      = new Color(1f, 1f, 1f, 1f);
             bodyCellBtnColors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
@@ -2303,43 +2329,43 @@ namespace SolarExpanseResourceTracker.UI
                 vlg.spacing = 1f;
                 vlg.padding = new RectOffset(2, 2, 3, 2);
 
-                // Row 1: size — the key number, prominent
-                var r1 = new GameObject("Size", typeof(RectTransform));
+                // Row 1: small icon + state — context at the top
+                var r1 = new GameObject("Meta", typeof(RectTransform));
                 r1.transform.SetParent(tile.transform, false);
-                r1.AddComponent<LayoutElement>().preferredHeight = 14f;
+                r1.AddComponent<LayoutElement>().preferredHeight = 10f;
                 var t1 = r1.AddComponent<TextMeshProUGUI>();
                 if (font != null) t1.font = font;
-                t1.text = ResourceTrackerFormat.FormatKT(badge.Size);
-                t1.fontSize = 11f;
-                t1.color = new Color(0.90f, 0.90f, 0.90f, 1f);
+                t1.text = (resIcon.Length > 0 ? resIcon + " " : "") +
+                          ResourceTrackerFormat.FormatState(badge.State);
+                t1.fontSize = 7f;
+                t1.color = new Color(0.50f, 0.50f, 0.50f, 1f);
                 t1.alignment = TextAlignmentOptions.Center;
                 t1.enableWordWrapping = false;
                 t1.raycastTarget = false;
 
-                // Row 2: quality factor (colored), prominent
-                string qualHex  = ResourceTrackerFormat.QualityColorHex(badge.Factor);
-                string factorStr = badge.Factor < 0.015f ? "<0.01" : badge.Factor.ToString("F2");
-                var r2 = new GameObject("Qual", typeof(RectTransform));
+                // Row 2: size — prominent
+                var r2 = new GameObject("Size", typeof(RectTransform));
                 r2.transform.SetParent(tile.transform, false);
-                r2.AddComponent<LayoutElement>().preferredHeight = 13f;
+                r2.AddComponent<LayoutElement>().preferredHeight = 14f;
                 var t2 = r2.AddComponent<TextMeshProUGUI>();
                 if (font != null) t2.font = font;
-                t2.text = $"<color={qualHex}>{factorStr}</color>";
-                t2.fontSize = 10f;
+                t2.text = ResourceTrackerFormat.FormatKT(badge.Size);
+                t2.fontSize = 11f;
+                t2.color = new Color(0.90f, 0.90f, 0.90f, 1f);
                 t2.alignment = TextAlignmentOptions.Center;
                 t2.enableWordWrapping = false;
                 t2.raycastTarget = false;
 
-                // Row 3: small icon + state — supplemental context
-                var r3 = new GameObject("Meta", typeof(RectTransform));
+                // Row 3: quality factor (colored) — prominent
+                string qualHex  = ResourceTrackerFormat.QualityColorHex(badge.Factor);
+                string factorStr = badge.Factor < 0.015f ? "<0.01" : badge.Factor.ToString("F2");
+                var r3 = new GameObject("Qual", typeof(RectTransform));
                 r3.transform.SetParent(tile.transform, false);
-                r3.AddComponent<LayoutElement>().preferredHeight = 10f;
+                r3.AddComponent<LayoutElement>().preferredHeight = 13f;
                 var t3 = r3.AddComponent<TextMeshProUGUI>();
                 if (font != null) t3.font = font;
-                t3.text = (resIcon.Length > 0 ? resIcon + " " : "") +
-                          ResourceTrackerFormat.FormatState(badge.State);
-                t3.fontSize = 7f;
-                t3.color = new Color(0.50f, 0.50f, 0.50f, 1f);
+                t3.text = $"<color={qualHex}>{factorStr}</color>";
+                t3.fontSize = 10f;
                 t3.alignment = TextAlignmentOptions.Center;
                 t3.enableWordWrapping = false;
                 t3.raycastTarget = false;

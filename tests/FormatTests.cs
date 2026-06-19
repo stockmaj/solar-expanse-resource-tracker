@@ -54,15 +54,15 @@ namespace ResourceTrackerTests
         }
 
         [Test]
-        public void FormatKT_AtMillion_ShowsMTTwoDecimals()
+        public void FormatKT_AtMillion_ShowsMTOneDecimal()
         {
-            Assert.That(ResourceTrackerFormat.FormatKT(1_000_000), Is.EqualTo("1.00MT"));
+            Assert.That(ResourceTrackerFormat.FormatKT(1_000_000), Is.EqualTo("1.0MT"));
         }
 
         [Test]
-        public void FormatKT_TwoAndHalfMillion_ShowsMTTwoDecimals()
+        public void FormatKT_TwoAndHalfMillion_ShowsMTOneDecimal()
         {
-            Assert.That(ResourceTrackerFormat.FormatKT(2_500_000), Is.EqualTo("2.50MT"));
+            Assert.That(ResourceTrackerFormat.FormatKT(2_500_000), Is.EqualTo("2.5MT"));
         }
 
         // ── FormatFlow ────────────────────────────────────────────────────────
