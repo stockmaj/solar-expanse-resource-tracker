@@ -669,9 +669,7 @@ namespace SolarExpanseResourceTracker.UI
             _allResources = GetAllResources();
             LoadConfig();
             BuildChrome(headerParent);
-            ApplyHeaderHeight(0f);
-            // Apply initial tab state: show/hide filter inputs, clean stale active resources
-            SwitchTab(_stockpilesTab);
+            ApplyTabVisuals(_stockpilesTab);  // visual-only init; no prefs save, scroll reset, or refresh
         }
 
         void LoadConfig()
@@ -837,10 +835,10 @@ namespace SolarExpanseResourceTracker.UI
             ResourceTrackerInjector.Log?.LogInfo("[RT] BuildChrome: done");
         }
 
-        void SwitchTab(bool stockpiles)
+        // Pure layout/visual setup — safe to call from both Init and user-initiated SwitchTab.
+        // No config saves (except the active-resource cleanup), no scroll reset, no data refresh.
+        void ApplyTabVisuals(bool stockpiles)
         {
-            _stockpilesTab = stockpiles;
-            _config?.SaveStockTab(stockpiles);
             if (_filterInputsGO != null) _filterInputsGO.SetActive(!stockpiles);
             if (stockpiles && _stripLE != null) { _stripLE.preferredHeight = 28f; ApplyHeaderHeight(); }
             if (_filterByTrigger != null)
@@ -853,10 +851,17 @@ namespace SolarExpanseResourceTracker.UI
                 kv.Value.gameObject.SetActive(showOnThisTab);
                 if (!showOnThisTab) _activeResources.Remove(kv.Key);
             }
-            if (!stockpiles) _config?.SaveActive(_activeResources); // persist after non-deposit cleanup
+            if (!stockpiles) _config?.SaveActive(_activeResources);
             if (!stockpiles) RebuildDepositFilterRow();
             UpdateTabHighlights();
             UpdateToggleHighlights();
+        }
+
+        void SwitchTab(bool stockpiles)
+        {
+            _stockpilesTab = stockpiles;
+            _config?.SaveStockTab(stockpiles);
+            ApplyTabVisuals(stockpiles);
             UpdateSortUI();
             if (_sortDropPanel != null) { UnityEngine.Object.Destroy(_sortDropPanel); _sortDropPanel = null; }
             _tabChanged   = true;
