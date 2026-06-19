@@ -1,0 +1,94 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net472;netstandard2.0</TargetFrameworks>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>ResourceTracker</AssemblyName>
+    <RootNamespace>SolarExpanseResourceTracker</RootNamespace>
+    <Optimize>false</Optimize>
+    <DebugType>portable</DebugType>
+    <NoWarn>CS0649;CS0414;CS1591;CS0162;CS8002</NoWarn>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <SolarExpanseRoot>$(SOLAR_EXPANSE_ROOT)</SolarExpanseRoot>
+    <BepInExCoreDir>$(SolarExpanseRoot)/BepInEx/core</BepInExCoreDir>
+    <BepInExPluginsDir>$(SolarExpanseRoot)/BepInEx/plugins</BepInExPluginsDir>
+    <SolarExpanseManagedDir>$(SolarExpanseRoot)/Solar Expanse_Data/Managed</SolarExpanseManagedDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <Compile Remove="Plugin.cs" />
+    <Compile Remove="Patches\ResourceTrackerPatch.cs" />
+    <Compile Remove="UI\ResourceTrackerInjector.cs" />
+  </ItemGroup>
+
+  <Target Name="ValidateSolarExpanseRoot" BeforeTargets="ResolveAssemblyReferences" Condition="'$(TargetFramework)' == 'net472'">
+    <Error Condition="'$(SolarExpanseRoot)' == ''"
+           Text="SOLAR_EXPANSE_ROOT is not set. Run through build.sh or set it to the Solar Expanse game root." />
+    <Error Condition="'$(SolarExpanseRoot)' != '' and !Exists('$(SolarExpanseRoot)')"
+           Text="SOLAR_EXPANSE_ROOT does not exist: $(SolarExpanseRoot)" />
+    <Error Condition="'$(SolarExpanseRoot)' != '' and !Exists('$(BepInExCoreDir)/BepInEx.dll')"
+           Text="Missing BepInEx.dll under $(BepInExCoreDir)." />
+    <Error Condition="'$(SolarExpanseRoot)' != '' and !Exists('$(SolarExpanseManagedDir)/Assembly-CSharp.dll')"
+           Text="Missing Assembly-CSharp.dll under $(SolarExpanseManagedDir)." />
+  </Target>
+
+  <Target Name="CopyToBepInExPlugins" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net472'">
+    <MakeDir Directories="$(BepInExPluginsDir)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll"
+          DestinationFolder="$(BepInExPluginsDir)"
+          OverwriteReadOnlyFiles="true" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCoreDir)/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCoreDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(SolarExpanseManagedDir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(SolarExpanseManagedDir)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SolarExpanseManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(SolarExpanseManagedDir)/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(SolarExpanseManagedDir)/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(SolarExpanseManagedDir)/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(SolarExpanseManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>$(SolarExpanseManagedDir)/Sirenix.Serialization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

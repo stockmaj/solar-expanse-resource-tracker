@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Run unit tests; also builds net472 mod if SOLAR_EXPANSE_ROOT is set"
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+
+dotnet test "$repo_root/tests" --nologo --verbosity quiet
+
+# When the game is available, also build the mod for net472 so that Unity-only
+# compilation errors (e.g. API members absent in the game's older Unity version)
+# are caught alongside the test run rather than surfacing only at deploy time.
+if [[ -n "${SOLAR_EXPANSE_ROOT:-}" && -d "$SOLAR_EXPANSE_ROOT" ]]; then
+  echo "SOLAR_EXPANSE_ROOT set — building net472 mod to catch game-target compile errors..."
+  dotnet build "$repo_root" -c Release --nologo --verbosity quiet \
+      -p:TargetFramework=net472
+fi

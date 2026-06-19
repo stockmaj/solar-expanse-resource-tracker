@@ -1,0 +1,9 @@
+[env]
+# Override in .mise.local.toml if your path differs.
+SOLAR_EXPANSE_ROOT = "{{env.HOME}}/Applications/Sikarugir/Steam Wine.app/Contents/SharedSupport/prefix/drive_c/Program Files (x86)/Steam/steamapps/common/Solar Expanse"
+
+[tools]
+dotnet = "8"
+
+[task_config]
+includes = ["scripts"]
