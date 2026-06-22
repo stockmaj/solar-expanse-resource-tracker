@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SolarExpanseResourceTracker.Core
 {
@@ -72,7 +73,7 @@ namespace SolarExpanseResourceTracker.Core
             switch (qual)
             {
                 case "eff":         return grp.EffScore;
-                case "bestquality": return grp.Badges.Count > 0 ? grp.Badges[0].Factor : 0;
+                case "bestquality": return grp.Badges.Count > 0 ? (double)grp.Badges.Max(b => b.Factor) : 0;
                 case "lasts":       return grp.TotalEstDays ?? double.MaxValue;
                 default:            return grp.TotalSize;
             }

@@ -27,11 +27,15 @@ Click **?** (top-right, next to Show Resources) to open this documentation.
 
 Click **Show Resources** (top-right of the panel) to open a panel where you can toggle individual resource rows on or off. Hiding a resource removes its rows from the table without affecting any active "Bodies with" filters — you can still filter by a resource whose rows are hidden.
 
+![Show/Hide Resources panel](assets/ShowHide.png)
+
 ---
 
 ## STOCKPILES tab
 
 Shows every body's current resource inventory — how much is held, how fast it's flowing in and out, and how long it will last.
+
+![Stockpiles tab](assets/Stockpiles.png)
 
 ### Columns
 
@@ -63,6 +67,8 @@ Use the **Sort** dropdowns to order bodies by name (A→Z) or by a specific reso
 ## DEPOSITS tab
 
 Shows explored mineral deposits across your empire: how much is there, how efficiently it can be extracted, and how long it will last at current mining rates.
+
+![Deposits tab](assets/Deposits.png)
 
 ### Columns
 
@@ -99,6 +105,8 @@ Each tile in the DEPOSITS column represents one deposit site. Top to bottom:
 3. Quality factor (green ≥ 0.7, yellow ≥ 0.4, red < 0.4)
 
 ### "Bodies with" filter + min qty/qual
+
+The icon strip on the Deposits tab shows only mineable resources — manufactured goods (Alloys, Electronics, Glass, Polymers, Steel, Supplies, Consumer Goods, Antimatter) are excluded because they have no deposit sites.
 
 Toggle resource icons to filter for bodies that have those deposits. When one or more icons are selected, per-resource threshold inputs appear inline with the icon strip:
 

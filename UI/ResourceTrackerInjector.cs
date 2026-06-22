@@ -116,7 +116,7 @@ namespace SolarExpanseResourceTracker.UI
     internal sealed class StockpileRowCache
     {
         public GameObject GO;
-        public TextMeshProUGUI BodyTMP, ResTMP, QtyTMP, StateTMP, InTMP, OutTMP, NetTMP, LastsTMP;
+        public TextMeshProUGUI BodyTMP, ResIconTMP, ResTMP, QtyTMP, StateTMP, InTMP, OutTMP, NetTMP, LastsTMP;
         public Image BgImage;
         public Image  BodySprite;
         public Button BodyBtn;
@@ -125,7 +125,7 @@ namespace SolarExpanseResourceTracker.UI
     internal sealed class DepositRowCache
     {
         public GameObject GO;
-        public TextMeshProUGUI BodyTMP, ResTMP, TotalTMP, EffTMP, TimeTMP;
+        public TextMeshProUGUI BodyTMP, ResIconTMP, ResTMP, TotalTMP, EffTMP, TimeTMP;
         public GameObject BadgesGO;
         public Image BgImage;
         public string BadgeSig;
@@ -304,7 +304,8 @@ namespace SolarExpanseResourceTracker.UI
                 tableHeaderVLG.childForceExpandHeight = false;
                 tableHeaderVLG.childForceExpandWidth  = true;
                 tableHeaderVLG.spacing  = 0f;
-                tableHeaderVLG.padding  = new RectOffset(0, 0, 0, 0);
+                // Match the 4px left/right padding of contentVLG so columns align with data rows
+                tableHeaderVLG.padding  = new RectOffset(4, 4, 0, 0);
 
                 var panel = panelGO.AddComponent<ResourceTrackerPanel>();
                 panel.Init(panelGO, panelRT, headerGO.transform, contentGO.transform, scrollRect, config,
@@ -569,6 +570,7 @@ namespace SolarExpanseResourceTracker.UI
         private RectTransform _tableHeaderRT;
         private const float TableHeaderH = 17f; // 16px header row + 1px separator
         private LayoutElement _stripLE;
+        private LayoutElement _filterInputsLE;
 
         // Tab state
         private bool _stockpilesTab = true;
@@ -586,7 +588,7 @@ namespace SolarExpanseResourceTracker.UI
         // UI references
         private Transform _contentParent;
         private ScrollRect _scrollRect;
-        private GameObject _filterInputsGO;     // deposits-only filter inputs (inline in strip)
+        private GameObject _filterInputsGO;     // deposits-only filter inputs (row below sprite strip)
 
         // Tab button refs for highlighting
         private Button _tabStock;
@@ -756,7 +758,7 @@ namespace SolarExpanseResourceTracker.UI
             iconsHLG.childControlWidth      = true;
             iconsHLG.childForceExpandWidth  = false;
             iconsHLG.childControlHeight     = true;
-            iconsHLG.childForceExpandHeight = false;
+            iconsHLG.childForceExpandHeight = false; // icons stay 28px even when filter area grows
             iconsHLG.spacing  = 3f;
             iconsHLG.padding  = new RectOffset(2, 2, 2, 2);
 
@@ -811,10 +813,11 @@ namespace SolarExpanseResourceTracker.UI
             _clearFilterBtn.gameObject.SetActive(false);
 
             ResourceTrackerInjector.Log?.LogInfo("[RT] BuildChrome: 7-filterInputs");
-            // Right group: filter inputs fill all remaining strip space (VLG for multi-row support)
+            // Filter inputs: flex fill to the right of icons inside stripContainer
             _filterInputsGO = new GameObject("FilterInputs", typeof(RectTransform));
             _filterInputsGO.transform.SetParent(stripContainer.transform, false);
-            _filterInputsGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            _filterInputsLE = _filterInputsGO.AddComponent<LayoutElement>();
+            _filterInputsLE.flexibleWidth = 1f;
             var filterInputsVLG = _filterInputsGO.AddComponent<VerticalLayoutGroup>();
             filterInputsVLG.childControlWidth      = true;
             filterInputsVLG.childForceExpandWidth  = true;
@@ -839,8 +842,8 @@ namespace SolarExpanseResourceTracker.UI
         // No config saves (except the active-resource cleanup), no scroll reset, no data refresh.
         void ApplyTabVisuals(bool stockpiles)
         {
-            if (_filterInputsGO != null) _filterInputsGO.SetActive(!stockpiles);
-            if (stockpiles && _stripLE != null) { _stripLE.preferredHeight = 28f; ApplyHeaderHeight(); }
+            if (stockpiles) SetFilterAreaHeight(0f);
+            // Deposit tab: RebuildDepositFilterRow() below calls SetFilterAreaHeight with the right value
             if (_filterByTrigger != null)
                 _filterByTrigger.Text = stockpiles
                     ? "Show only bodies that have all selected resources stockpiled"
@@ -887,24 +890,29 @@ namespace SolarExpanseResourceTracker.UI
 
             if (depositIds.Count == 0)
             {
-                MakeLabel("FilterHint", _filterInputsGO.transform, font,
-                    "Select a resource above to filter deposits", 8f, 0f,
+                // Hint appears as its own row below the sprite strip
+                var hintRow = MakeHRow("FHint", _filterInputsGO.transform, 20f, 0f);
+                MakeLabel("FHintLbl", hintRow.transform, font,
+                    "Select a resource to filter deposits", 8f, 0f,
                     TextAlignmentOptions.MidlineLeft, ColDim, flexibleWidth: 1f);
-                SetStripHeight(28f);
+                // filterInputsVLG padding top=2 + row 20 + bottom=2 = 24
+                SetFilterAreaHeight(24f);
                 return;
             }
 
-            const float CellH = 34f;    // 12px header row + 2px gap + 20px data row
-            const float ColQty  = 38f;  // qty input width
-            const float ColQual = 36f;  // qual input width
-            const float ColUnit = 16f;  // "KT" label width
+            const float HdrRowH = 14f;  // header labels sub-row height
+            const float DataRowH = 20f; // data inputs sub-row height
+            const float ColQty  = 38f;
+            const float ColQual = 36f;
+            const float ColUnit = 16f;
 
             int numRows = (depositIds.Count + 1) / 2;
 
             for (int rowIdx = 0; rowIdx < numRows; rowIdx++)
             {
-                // Outer HLG row containing 2 cells (or 1 cell + spacer)
-                var rowGO = MakeHRow($"FRow{rowIdx}", _filterInputsGO.transform, CellH, 4f);
+                bool hasHeader = rowIdx == 0;
+                float rowH = hasHeader ? HdrRowH + 2f + DataRowH : DataRowH;
+                var rowGO = MakeHRow($"FRow{rowIdx}", _filterInputsGO.transform, rowH, 4f);
 
                 for (int colIdx = 0; colIdx < 2; colIdx++)
                 {
@@ -926,12 +934,11 @@ namespace SolarExpanseResourceTracker.UI
                     float initQty  = _depositMinQty.TryGetValue(rdId,  out float q)  ? q  : 0f;
                     float initQual = _depositMinQual.TryGetValue(rdId, out float ql) ? ql : 0f;
 
-                    // Cell: VLG — header sub-row on top, data sub-row below
                     var cell    = new GameObject($"FCell_{rdId}", typeof(RectTransform));
                     cell.transform.SetParent(rowGO.transform, false);
                     var cellLE = cell.AddComponent<LayoutElement>();
                     cellLE.flexibleWidth  = 1f;
-                    cellLE.preferredWidth = 1f;  // override content preferred so both cols get equal width
+                    cellLE.preferredWidth = 1f;
                     var cellVLG = cell.AddComponent<VerticalLayoutGroup>();
                     cellVLG.childControlHeight     = true;
                     cellVLG.childControlWidth      = true;
@@ -940,19 +947,22 @@ namespace SolarExpanseResourceTracker.UI
                     cellVLG.spacing = 2f;
                     cellVLG.padding = new RectOffset(0, 0, 0, 0);
 
-                    // Header sub-row: labels above qty | KT-spacer | qual
-                    var hdrRow = MakeHRow($"FCH_{rdId}", cell.transform, 14f, 0f);
-                    MakeLabel($"FHL_{rdId}",   hdrRow.transform, font, "", 8.5f, 0f,
-                        TextAlignmentOptions.MidlineRight, ColDim, flexibleWidth: 1f);
-                    MakeLabel($"FHQTY_{rdId}", hdrRow.transform, font, "min qty", 8.5f, ColQty,
-                        TextAlignmentOptions.Center, new Color(0.55f, 0.55f, 0.55f, 1f));
-                    MakeLabel($"FHUN_{rdId}",  hdrRow.transform, font, "", 8.5f, ColUnit,
-                        TextAlignmentOptions.Center, ColDim);
-                    MakeLabel($"FHQL_{rdId}",  hdrRow.transform, font, "min qual", 8.5f, ColQual,
-                        TextAlignmentOptions.Center, new Color(0.55f, 0.55f, 0.55f, 1f));
+                    // Header sub-row: column labels — only on the first row
+                    if (hasHeader)
+                    {
+                        var hdrRow = MakeHRow($"FCH_{rdId}", cell.transform, HdrRowH, 0f);
+                        MakeLabel($"FHL_{rdId}",   hdrRow.transform, font, "", 8.5f, 0f,
+                            TextAlignmentOptions.MidlineRight, ColDim, flexibleWidth: 1f);
+                        MakeLabel($"FHQTY_{rdId}", hdrRow.transform, font, "min qty", 8.5f, ColQty,
+                            TextAlignmentOptions.Center, new Color(0.55f, 0.55f, 0.55f, 1f));
+                        MakeLabel($"FHUN_{rdId}",  hdrRow.transform, font, "", 8.5f, ColUnit,
+                            TextAlignmentOptions.Center, ColDim);
+                        MakeLabel($"FHQL_{rdId}",  hdrRow.transform, font, "min qual", 8.5f, ColQual,
+                            TextAlignmentOptions.Center, new Color(0.55f, 0.55f, 0.55f, 1f));
+                    }
 
                     // Data sub-row: resource label | qty | KT | qual
-                    var dataRow = MakeHRow($"FCD_{rdId}", cell.transform, 20f, 3f);
+                    var dataRow = MakeHRow($"FCD_{rdId}", cell.transform, DataRowH, 3f);
                     MakeLabel($"RL_{rdId}", dataRow.transform, font,
                         (icon.Length > 0 ? icon + " " : "") + name + ":",
                         8f, 0f, TextAlignmentOptions.MidlineRight, ColDim, flexibleWidth: 1f);
@@ -968,7 +978,11 @@ namespace SolarExpanseResourceTracker.UI
                                 _depositMinQty[capturedId] = v;
                                 if (qtyInputRef != null) qtyInputRef.text = v.ToString("F2");
                             }
-                            else _depositMinQty.Remove(capturedId);
+                            else
+                            {
+                                _depositMinQty.Remove(capturedId);
+                                if (qtyInputRef != null) qtyInputRef.text = "0.00";
+                            }
                             _config?.SaveDepositQty(_depositMinQty); _forceRefresh = true; RefreshRows(force: true);
                         });
                     qtyInputRef = qtyInput;
@@ -976,7 +990,6 @@ namespace SolarExpanseResourceTracker.UI
                     MakeLabel($"QtyUnit_{rdId}", dataRow.transform, font, "KT", 8f, ColUnit,
                         TextAlignmentOptions.MidlineLeft, ColDim);
 
-                    // Qual: clamp 0–1.0, 1 decimal place, always shown
                     TMP_InputField qualInputRef = null;
                     var qualInput = MakeInputField($"QI_{rdId}", dataRow.transform, font,
                         initQual > 0 ? initQual.ToString("F1") : "0.0", ColQual,
@@ -999,9 +1012,11 @@ namespace SolarExpanseResourceTracker.UI
                 }
             }
 
-            // Resize strip to accommodate the filter rows
-            float filterH = numRows * CellH + (numRows - 1) * 2f;  // rows × height + gaps
-            SetStripHeight(filterH + 6f);  // +6 for filterInputsVLG padding (2+2) + breathing room
+            // filterInputsVLG: padding top=2, bottom=2; spacing=2 between rows
+            // row 0 = HdrRowH+2+DataRowH = 36; subsequent rows = DataRowH = 20
+            // total = 2 + 36 + (numRows-1)*(20+2) + 2 = 40 + (numRows-1)*22
+            float filterH = 40f + (numRows - 1) * 22f;
+            SetFilterAreaHeight(filterH);
         }
 
         void UpdateTabHighlights()
@@ -1010,21 +1025,28 @@ namespace SolarExpanseResourceTracker.UI
             SetTabHighlight(_tabDepo,  !_stockpilesTab);
         }
 
-        void ApplyHeaderHeight(float filterRowH = 0f)
+        void ApplyHeaderHeight()
         {
-            float stripH  = _stripLE != null ? _stripLE.preferredHeight : 28f;
-            float h       = 54f + stripH;  // 4+22+2+stripH+2+22+2 = all header rows
-            float topGap  = 8f + h + 4f;                    // space from panel top to content area
-            float vpTop   = topGap + TableHeaderH;          // viewport starts below table header
+            // headerVLG rows: Tab(22) + Strip(28+filterH) + Sort(22)
+            // padding top=4, bottom=2; spacing=2 between rows.
+            // Strip grows to include filter inputs when active.
+            float filterH = _filterInputsGO != null && _filterInputsGO.activeSelf
+                ? (_filterInputsLE != null ? _filterInputsLE.preferredHeight : 24f) : 0f;
+            float stripH = 28f + filterH;
+            if (_stripLE != null) _stripLE.preferredHeight = stripH;
+            float h = 4f + 22f + 2f + stripH + 2f + 22f + 2f; // 54 + stripH
+            float topGap = 8f + h + 4f;
+            float vpTop  = topGap + TableHeaderH;
             if (_headerRT  != null) _headerRT.sizeDelta        = new Vector2(-16f, h);
             if (_tableHeaderRT != null)
             {
-                // Same anchor convention as headerGO: top-anchored, measure downward
+                // Left-pivot, left edge = 8px = viewport left edge (viewport offsetMin.x = 8)
+                // sizeDelta.x = -30: with left-pivot, right edge = panel_right - 22 = viewport right edge
                 _tableHeaderRT.anchorMin        = new Vector2(0f, 1f);
                 _tableHeaderRT.anchorMax        = new Vector2(1f, 1f);
-                _tableHeaderRT.pivot            = new Vector2(0.5f, 1f);
+                _tableHeaderRT.pivot            = new Vector2(0f, 1f);
                 _tableHeaderRT.sizeDelta        = new Vector2(-30f, TableHeaderH);
-                _tableHeaderRT.anchoredPosition = new Vector2(0f, -topGap);
+                _tableHeaderRT.anchoredPosition = new Vector2(8f, -topGap);
             }
             if (_viewportRT != null) _viewportRT.offsetMax      = new Vector2(-22f, -vpTop);
             if (_scrollbarRT != null)
@@ -1034,9 +1056,11 @@ namespace SolarExpanseResourceTracker.UI
             }
         }
 
-        void SetStripHeight(float h)
+        void SetFilterAreaHeight(float h)
         {
-            if (_stripLE != null) _stripLE.preferredHeight = h;
+            if (_filterInputsGO != null) _filterInputsGO.SetActive(h > 0f);
+            // _filterInputsLE tracks height so ApplyHeaderHeight can compute strip total
+            if (_filterInputsLE != null) _filterInputsLE.preferredHeight = h;
             ApplyHeaderHeight();
         }
 
@@ -1147,7 +1171,7 @@ namespace SolarExpanseResourceTracker.UI
             {
                 if (_stockpilesTab) _stockSortRes  = val;
                 else                _depositSortRes = val;
-                if (val == "") { _stockSortQual = "qty"; _depositSortQual = "total"; }
+                if (val == "") { if (_stockpilesTab) _stockSortQual = "qty"; else _depositSortQual = "total"; }
                 _config?.SaveStockSort(_stockSortRes, _stockSortQual);
                 _config?.SaveDepositSort(_depositSortRes, _depositSortQual);
                 UpdateSortUI();
@@ -1713,6 +1737,11 @@ namespace SolarExpanseResourceTracker.UI
                 result.Add(new BodyStockpileGroup { Name = oi.ObjectName, Rows = rows });
             }
             ResourceTrackerInjector.Log?.LogInfo($"[RT] BuildStockpiles: totalBodies={totalBodies} withData={bodiesWithData} withStockpileRows={bodiesWithRows} result={result.Count}");
+            var seen = new HashSet<string>();
+            foreach (var g in result) seen.Add(g.Name);
+            var staleNames = new List<string>();
+            foreach (var k in _bodySprites.Keys) if (!seen.Contains(k)) staleNames.Add(k);
+            foreach (var k in staleNames) { _bodySprites.Remove(k); _bodyOIs.Remove(k); }
             return result;
         }
 
@@ -1729,7 +1758,10 @@ namespace SolarExpanseResourceTracker.UI
             {
                 sb.Append(b.Name).Append('|');
                 foreach (var r in b.Rows)
-                    sb.Append(r.RdId).Append(':').Append(r.Qty.ToString("F0")).Append(',');
+                    sb.Append(r.RdId).Append(':').Append(r.Qty.ToString("F0"))
+                      .Append('/').Append(r.NetPerDay.ToString("F1"))
+                      .Append('/').Append(r.DaysLeft.HasValue ? r.DaysLeft.Value.ToString("F0") : "∞")
+                      .Append(',');
             }
             return sb.ToString();
         }
@@ -1848,6 +1880,11 @@ namespace SolarExpanseResourceTracker.UI
                 result.Add(new BodyDepositGroup { Name = oi.ObjectName, Groups = groups, TotalEff = totalEff });
             }
             ResourceTrackerInjector.Log?.LogInfo($"[RT] BuildDeposits: totalBodies={totalBodies} withDepositRows={bodiesWithDeposits} added={bodiesAdded} result={result.Count}");
+            var seen = new HashSet<string>();
+            foreach (var g in result) seen.Add(g.Name);
+            var staleNames = new List<string>();
+            foreach (var k in _bodySprites.Keys) if (!seen.Contains(k)) staleNames.Add(k);
+            foreach (var k in staleNames) { _bodySprites.Remove(k); _bodyOIs.Remove(k); }
             return result;
         }
 
@@ -1979,6 +2016,7 @@ namespace SolarExpanseResourceTracker.UI
             bodyCell.transform.SetParent(go.transform, false);
             var bodyCellLE  = bodyCell.AddComponent<LayoutElement>();
             bodyCellLE.preferredWidth = SW_Body;
+            bodyCellLE.flexibleWidth  = 0f; // prevent inner HLG's flex=1 from bleeding to outer HLG
             var bodyCellHLG = bodyCell.AddComponent<HorizontalLayoutGroup>();
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
@@ -2000,7 +2038,7 @@ namespace SolarExpanseResourceTracker.UI
             // Text child
             var bodyTxtGO = new GameObject("Txt", typeof(RectTransform));
             bodyTxtGO.transform.SetParent(bodyCell.transform, false);
-            bodyTxtGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            bodyTxtGO.AddComponent<LayoutElement>().preferredWidth = 101f; // SW_Body(118) - sprite(14) - spacing(3)
             var bodyTMP = bodyTxtGO.AddComponent<TextMeshProUGUI>();
             if (ResourceTrackerInjector.FontAsset != null) bodyTMP.font = ResourceTrackerInjector.FontAsset;
             bodyTMP.fontSize = 10f; bodyTMP.alignment = TextAlignmentOptions.MidlineLeft;
@@ -2019,7 +2057,31 @@ namespace SolarExpanseResourceTracker.UI
             bodyOvImg.color = Color.clear;
             bodyOvImg.raycastTarget = true;
             bodyCellBtn.targetGraphic = bodyOvImg;
-            c.ResTMP   = AddCol(go.transform, SW_Res,   0f, TextAlignmentOptions.MidlineLeft,  "", ColBody, 0f);
+            // Resource column: fixed-width icon + flex name in a sub-HLG so icon width never shifts the name
+            var resCell = new GameObject("ResCol", typeof(RectTransform));
+            resCell.transform.SetParent(go.transform, false);
+            var resCellLE = resCell.AddComponent<LayoutElement>();
+            resCellLE.preferredWidth = SW_Res;
+            resCellLE.flexibleWidth  = 0f; // prevent inner HLG's flex=1 from bleeding to outer HLG
+            var resHLG = resCell.AddComponent<HorizontalLayoutGroup>();
+            resHLG.childControlWidth = true; resHLG.childForceExpandWidth = false;
+            resHLG.childControlHeight = true; resHLG.childForceExpandHeight = true;
+            resHLG.spacing = 0f; resHLG.padding = new RectOffset(0, 0, 0, 0);
+            var resIconGO = new GameObject("Icon", typeof(RectTransform));
+            resIconGO.transform.SetParent(resCell.transform, false);
+            resIconGO.AddComponent<LayoutElement>().preferredWidth = 18f;
+            c.ResIconTMP = resIconGO.AddComponent<TextMeshProUGUI>();
+            if (ResourceTrackerInjector.FontAsset != null) c.ResIconTMP.font = ResourceTrackerInjector.FontAsset;
+            c.ResIconTMP.fontSize = 10f; c.ResIconTMP.alignment = TextAlignmentOptions.Center;
+            c.ResIconTMP.color = ColBody; c.ResIconTMP.enableWordWrapping = false; c.ResIconTMP.raycastTarget = false;
+            var resNameGO = new GameObject("Name", typeof(RectTransform));
+            resNameGO.transform.SetParent(resCell.transform, false);
+            resNameGO.AddComponent<LayoutElement>().preferredWidth = 72f; // SW_Res(90) - icon(18)
+            c.ResTMP = resNameGO.AddComponent<TextMeshProUGUI>();
+            if (ResourceTrackerInjector.FontAsset != null) c.ResTMP.font = ResourceTrackerInjector.FontAsset;
+            c.ResTMP.fontSize = 10f; c.ResTMP.alignment = TextAlignmentOptions.MidlineLeft;
+            c.ResTMP.color = ColBody; c.ResTMP.enableWordWrapping = false;
+            c.ResTMP.overflowMode = TextOverflowModes.Ellipsis; c.ResTMP.raycastTarget = false;
             c.QtyTMP   = AddCol(go.transform, SW_Qty,   0f, TextAlignmentOptions.MidlineRight, "", ColBody, 0f);
             c.StateTMP = AddCol(go.transform, SW_State, 0f, TextAlignmentOptions.Midline,      "", ColDim,  0f);
             c.InTMP    = AddCol(go.transform, SW_In,    0f, TextAlignmentOptions.MidlineRight, "", ColGreen,0f);
@@ -2052,7 +2114,8 @@ namespace SolarExpanseResourceTracker.UI
                 }
             }
             string resIcon = _allResources.Find(r => r.ID == row.RdId)?.IconString ?? "";
-            c.ResTMP.text = (resIcon.Length > 0 ? resIcon + " " : "") + row.RdName;
+            if (c.ResIconTMP != null) c.ResIconTMP.text = resIcon;
+            c.ResTMP.text   = row.RdName;
             c.QtyTMP.text   = ResourceTrackerFormat.FormatQty(row.Qty);
             c.StateTMP.text = ResourceTrackerFormat.FormatState(row.State);
 
@@ -2217,6 +2280,7 @@ namespace SolarExpanseResourceTracker.UI
             bodyCell.transform.SetParent(go.transform, false);
             var bodyCellLE  = bodyCell.AddComponent<LayoutElement>();
             bodyCellLE.preferredWidth = DW_Body;
+            bodyCellLE.flexibleWidth  = 0f; // prevent inner HLG's flex=1 from bleeding to outer HLG
             var bodyCellHLG = bodyCell.AddComponent<HorizontalLayoutGroup>();
             bodyCellHLG.childControlWidth = true; bodyCellHLG.childForceExpandWidth = false;
             bodyCellHLG.childControlHeight = true; bodyCellHLG.childForceExpandHeight = true;
@@ -2236,7 +2300,7 @@ namespace SolarExpanseResourceTracker.UI
             c.BodySprite.raycastTarget  = false;
             var bodyTxtGO = new GameObject("Txt", typeof(RectTransform));
             bodyTxtGO.transform.SetParent(bodyCell.transform, false);
-            bodyTxtGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            bodyTxtGO.AddComponent<LayoutElement>().preferredWidth = 101f; // DW_Body(118) - sprite(14) - spacing(3)
             var bodyTMP = bodyTxtGO.AddComponent<TextMeshProUGUI>();
             if (ResourceTrackerInjector.FontAsset != null) bodyTMP.font = ResourceTrackerInjector.FontAsset;
             bodyTMP.fontSize = 10f; bodyTMP.alignment = TextAlignmentOptions.MidlineLeft;
@@ -2253,7 +2317,30 @@ namespace SolarExpanseResourceTracker.UI
             bodyOv2Img.color = Color.clear;
             bodyOv2Img.raycastTarget = true;
             bodyCellBtn.targetGraphic = bodyOv2Img;
-            c.ResTMP   = AddCol(go.transform, DW_Res,   0f, TextAlignmentOptions.MidlineLeft,   "", ColBody, 0f);
+            var dResCell = new GameObject("ResCol", typeof(RectTransform));
+            dResCell.transform.SetParent(go.transform, false);
+            var dResCellLE = dResCell.AddComponent<LayoutElement>();
+            dResCellLE.preferredWidth = DW_Res;
+            dResCellLE.flexibleWidth  = 0f; // prevent inner HLG's flex=1 from bleeding to outer HLG
+            var dResHLG = dResCell.AddComponent<HorizontalLayoutGroup>();
+            dResHLG.childControlWidth = true; dResHLG.childForceExpandWidth = false;
+            dResHLG.childControlHeight = true; dResHLG.childForceExpandHeight = true;
+            dResHLG.spacing = 0f; dResHLG.padding = new RectOffset(0, 0, 0, 0);
+            var dResIconGO = new GameObject("Icon", typeof(RectTransform));
+            dResIconGO.transform.SetParent(dResCell.transform, false);
+            dResIconGO.AddComponent<LayoutElement>().preferredWidth = 18f;
+            c.ResIconTMP = dResIconGO.AddComponent<TextMeshProUGUI>();
+            if (ResourceTrackerInjector.FontAsset != null) c.ResIconTMP.font = ResourceTrackerInjector.FontAsset;
+            c.ResIconTMP.fontSize = 10f; c.ResIconTMP.alignment = TextAlignmentOptions.Center;
+            c.ResIconTMP.color = ColBody; c.ResIconTMP.enableWordWrapping = false; c.ResIconTMP.raycastTarget = false;
+            var dResNameGO = new GameObject("Name", typeof(RectTransform));
+            dResNameGO.transform.SetParent(dResCell.transform, false);
+            dResNameGO.AddComponent<LayoutElement>().preferredWidth = 72f; // DW_Res(90) - icon(18)
+            c.ResTMP = dResNameGO.AddComponent<TextMeshProUGUI>();
+            if (ResourceTrackerInjector.FontAsset != null) c.ResTMP.font = ResourceTrackerInjector.FontAsset;
+            c.ResTMP.fontSize = 10f; c.ResTMP.alignment = TextAlignmentOptions.MidlineLeft;
+            c.ResTMP.color = ColBody; c.ResTMP.enableWordWrapping = false;
+            c.ResTMP.overflowMode = TextOverflowModes.Ellipsis; c.ResTMP.raycastTarget = false;
             c.TotalTMP = AddCol(go.transform, DW_Total, 0f, TextAlignmentOptions.MidlineRight,  "", ColDim,  0f);
             c.EffTMP   = AddCol(go.transform, DW_Eff,   0f, TextAlignmentOptions.MidlineRight,  "", ColGold, 0f);
             c.TimeTMP  = AddCol(go.transform, DW_Time,  0f, TextAlignmentOptions.Midline, "", ColDim,  0f);
@@ -2297,7 +2384,8 @@ namespace SolarExpanseResourceTracker.UI
                 }
             }
             string resIcon = _allResources.Find(r => r.ID == grp.RdId)?.IconString ?? "";
-            c.ResTMP.text = (resIcon.Length > 0 ? resIcon + " " : "") + grp.RdName;
+            if (c.ResIconTMP != null) c.ResIconTMP.text = resIcon;
+            c.ResTMP.text   = grp.RdName;
             c.TotalTMP.text = ResourceTrackerFormat.FormatKT(grp.TotalSize);
             c.EffTMP.text   = ResourceTrackerFormat.FormatKT(grp.EffScore);
 

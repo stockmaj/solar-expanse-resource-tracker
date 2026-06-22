@@ -264,6 +264,33 @@ namespace ResourceTrackerTests
             Assert.That(bodies[0].Name, Is.EqualTo("HighQ"));
         }
 
+        [Test]
+        public void SortDeposits_ByBestQuality_ActiveMineDoesNotMaskHigherInactiveFactor()
+        {
+            // Body A: active mine factor=0.3, inactive deposit factor=0.9 — best quality is 0.9
+            // Body B: single active mine factor=0.6 — best quality is 0.6
+            // Before fix, Badges[0] (active-first sort) returned 0.3 for A, so B ranked above A incorrectly.
+            var badgesA = new[] { MakeBadge(200, 0.3f), MakeBadge(300, 0.9f) };
+            var grpA = new DepositGroup { RdId = "water", RdName = "water", TotalSize = 500, EffScore = 330 };
+            grpA.Badges.AddRange(badgesA);
+            // Simulate the active-first sort that BuildDeposits applies
+            grpA.Badges.Sort((a, b) =>
+            {
+                int actA = a.OutTakePerDay > 1e-9 ? 0 : 1;
+                int actB = b.OutTakePerDay > 1e-9 ? 0 : 1;
+                if (actA != actB) return actA.CompareTo(actB);
+                return b.Factor.CompareTo(a.Factor);
+            });
+
+            var bodies = new List<BodyDepositGroup>
+            {
+                MakeDepositBody("A", grpA),
+                MakeDepositBody("B", MakeDepositGroup("water", 500, 300, null, MakeBadge(500, 0.6f))),
+            };
+            ResourceTrackerSort.SortDeposits(bodies, "water", "bestquality");
+            Assert.That(bodies[0].Name, Is.EqualTo("A"));
+        }
+
         // ── SortDeposits — by lasts ────────────────────────────────────────
 
         [Test]
