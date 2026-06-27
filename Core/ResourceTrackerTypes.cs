@@ -28,6 +28,7 @@ namespace SolarExpanseResourceTracker.Core
         public ResourceState State;
         public double OutTakePerDay;
         public double? EstDays;
+        public bool Preliminary;
     }
 
     public sealed class DepositGroup
@@ -38,6 +39,7 @@ namespace SolarExpanseResourceTracker.Core
         public double EffScore;
         public double RatePerUnit;
         public double? TotalEstDays;
+        public bool Preliminary;
         public System.Collections.Generic.List<DepositBadge> Badges = new System.Collections.Generic.List<DepositBadge>();
     }
 

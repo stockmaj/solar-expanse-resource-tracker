@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-27
+### Fixed
+- Deposits tab no longer shows orbital stations (e.g. Dione [Orbit]).
+- Unprobed deposits now correctly show "?" instead of the underlying data the game hides until a probe returns.
+- Mixed bodies (some deposits probed, some not) show real values for probed deposits and "?" tiles for unprobed ones.
+
 ## [0.5.0] - 2026-06-21
 ### Added
 - Sort selection is saved and restored on reload, separately for each tab.

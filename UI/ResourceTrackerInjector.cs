@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using Data;
 using Data.ScriptableObject;
 using Game;
 using Game.Info;
@@ -1782,6 +1783,7 @@ namespace SolarExpanseResourceTracker.UI
             foreach (var oi in mgr.allObjectInfos)
             {
                 if (oi == null || oi.IsInGameDestroy) continue;
+                if (oi.objectTypes == EObjectTypes.Orbit || oi.objectTypes == EObjectTypes.SolarOrbit) continue;
                 totalBodies++;
                 ObjectInfoData data = null;
                 try { data = oi.GetObjectInfoData(player); }
@@ -1799,7 +1801,7 @@ namespace SolarExpanseResourceTracker.UI
                     if (dep?.ResourceType == null) continue;
                     if (!dep.ExploredInAnyCapacity) continue;
                     if (dep.ObservedData == null) continue;
-                    if (dep.ObservedData.Value <= 0) continue;
+                    bool preliminary = dep.Value < 1.0; // dep.Value is survey-completion level; <1.0 = not fully probed
                     string key = dep.ResourceType.ID;
                     if (!byRd.ContainsKey(key)) byRd[key] = new List<RowExploredResourcesData>();
                     byRd[key].Add(dep);
@@ -1813,26 +1815,30 @@ namespace SolarExpanseResourceTracker.UI
                     var gameRd = kv.Value[0].ResourceType;
                     var badges = new List<DepositBadge>();
                     double total = 0, eff = 0;
+                    bool allPreliminary = true;
 
                     foreach (var dep in kv.Value)
                     {
-                        double size      = dep.ObservedData.Value;
-                        float  factor    = Mathf.Max(dep.ObservedData.MiningFactor ?? 1f, 0.01f);
-                        double outTake   = dep.ObservedData.OutTake;
-                        total += size;
-                        eff   += size * factor;
+                        bool depPrelim = dep.Value < 1.0;
+                        if (!depPrelim) allPreliminary = false;
+                        double size    = dep.ObservedData.Value;
+                        float  factor  = Mathf.Max(dep.ObservedData.MiningFactor ?? 1f, 0.01f);
+                        double outTake = dep.ObservedData.OutTake;
+                        if (!depPrelim) { total += size; eff += size * factor; }
                         badges.Add(new DepositBadge
                         {
                             Size          = size,
                             Factor        = factor,
                             State         = (ResourceState)(int)dep.ObservedData.ResourceState,
                             OutTakePerDay = outTake,
+                            Preliminary   = depPrelim,
                         });
                     }
 
-                    // Sort badges: actively-mined first, then by factor desc
+                    // Sort badges: actively-mined first, then by factor desc; preliminary last
                     badges.Sort((a, b) =>
                     {
+                        if (a.Preliminary != b.Preliminary) return a.Preliminary ? 1 : -1;
                         int activeA = a.OutTakePerDay > 1e-9 ? 0 : 1;
                         int activeB = b.OutTakePerDay > 1e-9 ? 0 : 1;
                         if (activeA != activeB) return activeA.CompareTo(activeB);
@@ -1843,7 +1849,7 @@ namespace SolarExpanseResourceTracker.UI
                     // ratePerUnit = outTake / factor → rate any deposit would see = ratePerUnit × factor.
                     double ratePerUnit = 0;
                     foreach (var badge in badges)
-                        if (badge.OutTakePerDay > 1e-9)
+                        if (!badge.Preliminary && badge.OutTakePerDay > 1e-9)
                         {
                             double r = badge.OutTakePerDay / badge.Factor;
                             if (r > ratePerUnit) ratePerUnit = r;
@@ -1856,6 +1862,7 @@ namespace SolarExpanseResourceTracker.UI
                         double sum = 0;
                         foreach (var badge in badges)
                         {
+                            if (badge.Preliminary) continue;
                             double rate = ratePerUnit * badge.Factor;
                             badge.EstDays = badge.Size / rate;
                             sum += badge.EstDays.Value;
@@ -1871,6 +1878,7 @@ namespace SolarExpanseResourceTracker.UI
                         EffScore     = eff,
                         RatePerUnit  = ratePerUnit,
                         TotalEstDays = totalEstDays,
+                        Preliminary  = allPreliminary,
                         Badges       = badges,
                     });
                 }
@@ -2386,16 +2394,24 @@ namespace SolarExpanseResourceTracker.UI
             string resIcon = _allResources.Find(r => r.ID == grp.RdId)?.IconString ?? "";
             if (c.ResIconTMP != null) c.ResIconTMP.text = resIcon;
             c.ResTMP.text   = grp.RdName;
-            c.TotalTMP.text = ResourceTrackerFormat.FormatKT(grp.TotalSize);
-            c.EffTMP.text   = ResourceTrackerFormat.FormatKT(grp.EffScore);
-
-            if (grp.TotalEstDays.HasValue)
+            if (grp.Preliminary)
             {
-                c.TimeTMP.text  = ResourceTrackerFormat.FormatDays(grp.TotalEstDays.Value);
-                c.TimeTMP.color = grp.TotalEstDays.Value < 30  ? ColRed :
-                                  grp.TotalEstDays.Value < 90  ? ColYellow : ColGreen;
+                c.TotalTMP.text = "?"; c.TotalTMP.color = ColDim;
+                c.EffTMP.text   = "?"; c.EffTMP.color   = ColDim;
+                c.TimeTMP.text  = "—"; c.TimeTMP.color  = ColDim;
             }
-            else { c.TimeTMP.text = "—"; c.TimeTMP.color = ColDim; }
+            else
+            {
+                c.TotalTMP.text  = ResourceTrackerFormat.FormatKT(grp.TotalSize); c.TotalTMP.color = ColDim;
+                c.EffTMP.text    = ResourceTrackerFormat.FormatKT(grp.EffScore);  c.EffTMP.color   = ColGold;
+                if (grp.TotalEstDays.HasValue)
+                {
+                    c.TimeTMP.text  = ResourceTrackerFormat.FormatDays(grp.TotalEstDays.Value);
+                    c.TimeTMP.color = grp.TotalEstDays.Value < 30  ? ColRed :
+                                      grp.TotalEstDays.Value < 90  ? ColYellow : ColGreen;
+                }
+                else { c.TimeTMP.text = "—"; c.TimeTMP.color = ColDim; }
+            }
 
             string newBadgeSig = ComputeBadgeSig(grp.Badges);
             if (newBadgeSig != c.BadgeSig)
@@ -2438,6 +2454,21 @@ namespace SolarExpanseResourceTracker.UI
                 vlg.childControlHeight = true; vlg.childForceExpandHeight = false;
                 vlg.spacing = 1f;
                 vlg.padding = new RectOffset(2, 2, 3, 2);
+
+                if (badge.Preliminary)
+                {
+                    var qMark = new GameObject("Q", typeof(RectTransform));
+                    qMark.transform.SetParent(tile.transform, false);
+                    var qTMP = qMark.AddComponent<TextMeshProUGUI>();
+                    if (font != null) qTMP.font = font;
+                    qTMP.text = "?";
+                    qTMP.fontSize = 16f;
+                    qTMP.color = ColDim;
+                    qTMP.alignment = TextAlignmentOptions.Center;
+                    qTMP.enableWordWrapping = false;
+                    qTMP.raycastTarget = false;
+                    continue;
+                }
 
                 // Row 1: small icon + state — context at the top
                 var r1 = new GameObject("Meta", typeof(RectTransform));

@@ -6,7 +6,7 @@ using SolarExpanseResourceTracker.UI;
 
 namespace SolarExpanseResourceTracker
 {
-    [BepInPlugin("com.mod.solarexpanse.resourcetracker", "ResourceTracker", "0.5.0")]
+    [BepInPlugin("com.mod.solarexpanse.resourcetracker", "ResourceTracker", "0.6.0")]
     public class Plugin : BaseUnityPlugin
     {
         internal static BepInEx.Logging.ManualLogSource Log { get; private set; }
